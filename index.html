@@ -2,379 +2,76 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>シンプル家計簿</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Daily Budget</title>
 
-  <link rel="apple-touch-icon" href="icon.ping.jpg">
-  
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- 以前のアプリアイコン設定を流用 -->
+  <link rel="apple-touch-icon" href="icon.ping.png">
+
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-    .tab-content { display: none; }
-    .tab-content.active { display: block; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; text-align: center; padding: 50px 20px; background: #f4f6f8; margin: 0; }
+    .card { background: white; padding: 35px 25px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.08); max-width: 320px; margin: 0 auto; }
+    .label { font-size: 14px; color: #777; font-weight: 600; letter-spacing: 1px; }
+    .balance { font-size: 44px; font-weight: 800; color: #2e7d32; margin: 20px 0; }
+    input { width: 85%; padding: 14px; font-size: 18px; border: 2px solid #e0e0e0; border-radius: 12px; text-align: center; margin-bottom: 20px; outline: none; box-sizing: border-box; }
+    input:focus { border-color: #1e88e5; }
+    .btn-group { display: flex; gap: 10px; }
+    button { flex: 1; padding: 14px; font-size: 16px; border: none; border-radius: 12px; cursor: pointer; font-weight: bold; transition: opacity 0.2s; }
+    button:active { opacity: 0.8; }
+    .btn-sub { background: #e53935; color: white; }
+    .btn-add { background: #1e88e5; color: white; }
   </style>
 </head>
-<body class="bg-gray-50 text-gray-800 pb-24">
+<body>
 
-  <!-- ヘッダー -->
-  <header class="bg-white border-b border-gray-200 sticky top-0 z-10 px-4 py-3 flex justify-between items-center">
-    <h1 class="text-base font-bold text-gray-800" id="headerTitle">入力</h1>
-    <div class="text-xs text-gray-500 font-semibold" id="headerSub">2026年8月</div>
-  </header>
+<div class="card">
+  <div class="label">今使えるお金</div>
+  <div class="balance" id="balanceDisplay">--- 円</div>
 
-  <main class="max-w-md mx-auto p-4">
+  <input type="number" id="amountInput" placeholder="金額を入力 (円)" inputmode="numeric">
 
-    <!-- ==================== 1. 入力タブ ==================== -->
-    <section id="tab-input" class="tab-content active space-y-4">
-      <!-- 収支切替スイッチ -->
-      <div class="flex bg-gray-200 p-1 rounded-xl font-bold text-sm">
-        <button type="button" id="typeExpenseBtn" onclick="setType(0)" class="flex-1 py-1.5 rounded-lg bg-white text-green-600 shadow-sm transition">支出</button>
-        <button type="button" id="typeIncomeBtn" onclick="setType(1)" class="flex-1 py-1.5 rounded-lg text-gray-500 transition">収入</button>
-      </div>
+  <div class="btn-group">
+    <button class="btn-sub" onclick="updateBalance(-1)">使った（引く）</button>
+    <button class="btn-add" onclick="updateBalance(1)">追加（足す）</button>
+  </div>
+</div>
 
-      <!-- 入力カード -->
-      <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm space-y-3">
-        <div class="flex items-center justify-between border-b pb-2">
-          <span class="text-xs font-semibold text-gray-500">日付</span>
-          <input type="date" id="inputDate" class="text-sm font-bold text-gray-700 bg-transparent outline-none text-right">
-        </div>
+<script>
+  // Step 4 でメモした URL に書き換えてください
+  const API_BASE_URL = "https://xxxx.trycloudflare.com"; 
 
-        <div class="flex items-center justify-between border-b pb-2">
-          <span class="text-xs font-semibold text-gray-500">メモ</span>
-          <input type="text" id="memo" placeholder="未入力" class="text-sm text-right bg-transparent outline-none w-2/3">
-        </div>
+  async function fetchBalance() {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/balance`);
+      const data = await res.json();
+      document.getElementById('balanceDisplay').innerText = `${data.balance.toLocaleString()} 円`;
+    } catch (e) {
+      document.getElementById('balanceDisplay').innerText = "エラー";
+    }
+  }
 
-        <div class="flex items-center justify-between pt-1">
-          <span class="text-xs font-semibold text-gray-500" id="amountLabel">支出</span>
-          <div class="flex items-center space-x-1">
-            <input type="number" id="amount" placeholder="0" class="text-2xl font-extrabold text-right bg-transparent outline-none w-32 text-gray-800">
-            <span class="text-sm font-bold text-gray-500">円</span>
-          </div>
-        </div>
-      </div>
+  async function updateBalance(sign) {
+    const input = document.getElementById('amountInput');
+    const val = parseInt(input.value);
+    if (!val || val <= 0) return;
 
-      <!-- カテゴリー選択（グリッド表示） -->
-      <div>
-        <h3 class="text-xs font-bold text-gray-500 mb-2">カテゴリー</h3>
-        <div id="categoryGrid" class="grid grid-cols-3 gap-2">
-          <!-- JSで動的生成 -->
-        </div>
-      </div>
-
-      <!-- 保存ボタン -->
-      <button onclick="saveTransaction()" class="w-full bg-green-500 text-white font-bold py-3.5 rounded-2xl shadow-md hover:bg-green-600 active:scale-95 transition text-base">
-        保存する
-      </button>
-    </section>
-
-
-    <!-- ==================== 2. カレンダータブ ==================== -->
-    <section id="tab-calendar" class="tab-content space-y-4">
-      <!-- 月間サマリー -->
-      <div class="grid grid-cols-3 gap-2 bg-white p-3 rounded-2xl border border-gray-100 shadow-sm text-center">
-        <div>
-          <p class="text-[10px] font-semibold text-gray-400">収入</p>
-          <p class="text-xs font-bold text-blue-500" id="calIncome">¥0</p>
-        </div>
-        <div>
-          <p class="text-[10px] font-semibold text-gray-400">支出</p>
-          <p class="text-xs font-bold text-red-500" id="calExpense">¥0</p>
-        </div>
-        <div>
-          <p class="text-[10px] font-semibold text-gray-400">合計</p>
-          <p class="text-xs font-bold text-gray-800" id="calTotal">¥0</p>
-        </div>
-      </div>
-
-      <!-- 日別明細リスト -->
-      <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm space-y-2">
-        <h3 class="text-xs font-bold text-gray-500 mb-2" id="selectedDateTitle">明細一覧</h3>
-        <div id="dailyHistoryList" class="space-y-2 max-h-60 overflow-y-auto">
-          <!-- 明細データ -->
-        </div>
-      </div>
-    </section>
-
-
-    <!-- ==================== 3. レポートタブ ==================== -->
-    <section id="tab-report" class="tab-content space-y-4">
-      <!-- 収支カード -->
-      <div class="grid grid-cols-2 gap-2">
-        <div class="bg-white p-3 rounded-2xl border border-gray-100 shadow-sm text-center">
-          <p class="text-xs text-gray-400 font-semibold">支出</p>
-          <p class="text-lg font-extrabold text-red-500" id="reportExpense">¥0</p>
-        </div>
-        <div class="bg-white p-3 rounded-2xl border border-gray-100 shadow-sm text-center">
-          <p class="text-xs text-gray-400 font-semibold">収入</p>
-          <p class="text-lg font-extrabold text-blue-500" id="reportIncome">¥0</p>
-        </div>
-      </div>
-
-      <div class="bg-white p-3 rounded-2xl border border-gray-100 shadow-sm text-center">
-        <p class="text-xs text-gray-400 font-semibold">現在の総残高（総資産）</p>
-        <p class="text-2xl font-black text-gray-800" id="reportBalance">¥0</p>
-      </div>
-
-      <!-- ジャンル別ドーナツグラフ -->
-      <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
-        <h3 class="text-xs font-bold text-gray-500 mb-2">ジャンル別内訳</h3>
-        <div class="w-48 mx-auto">
-          <canvas id="categoryDoughnut"></canvas>
-        </div>
-        <div id="categoryPercentList" class="mt-4 space-y-2 text-xs">
-          <!-- JSでカテゴリ割合リストを挿入 -->
-        </div>
-      </div>
-    </section>
-
-
-    <!-- ==================== 4. AI予測タブ ==================== -->
-    <section id="tab-ai" class="tab-content space-y-4">
-      <div class="bg-indigo-600 text-white p-5 rounded-2xl shadow-md text-center">
-        <p class="text-xs text-indigo-200 font-semibold">🤖 AI 翌月支出予測金額</p>
-        <p class="text-3xl font-extrabold mt-1" id="aiPrediction">計算中...</p>
-      </div>
-
-      <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
-        <h3 class="text-xs font-bold text-gray-500 mb-2">月別支出推移グラフ</h3>
-        <canvas id="aiTrendChart" class="w-full h-48"></canvas>
-      </div>
-    </section>
-
-  </main>
-
-
-  <!-- ==================== 下部固定タブバー（スマホアプリ風） ==================== -->
-  <nav class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 py-2 px-4 max-w-md mx-auto flex justify-around items-center z-20">
-    <button onclick="switchTab('input')" id="nav-input" class="flex flex-col items-center text-green-600 font-bold">
-      <span class="text-xl">✏️</span>
-      <span class="text-[10px] font-bold mt-0.5">入力</span>
-    </button>
-    <button onclick="switchTab('calendar')" id="nav-calendar" class="flex flex-col items-center text-gray-400">
-      <span class="text-xl">📅</span>
-      <span class="text-[10px] font-bold mt-0.5">履歴</span>
-    </button>
-    <button onclick="switchTab('report')" id="nav-report" class="flex flex-col items-center text-gray-400">
-      <span class="text-xl">🍕</span>
-      <span class="text-[10px] font-bold mt-0.5">レポート</span>
-    </button>
-    <button onclick="switchTab('ai')" id="nav-ai" class="flex flex-col items-center text-gray-400">
-      <span class="text-xl">🤖</span>
-      <span class="text-[10px] font-bold mt-0.5">AI予測</span>
-    </button>
-  </nav>
-
-  <script>
-    // ⚠️ ご自身の OCI (ub) の IP アドレスに変更してください
-    const API_BASE_URL = "https://mumbai-usr-seekers-saints.trycloudflare.com";
-
-    let currentType = 0; // 0: 支出, 1: 収入
-    let selectedCategoryId = null;
-    let categoriesData = [];
-    let dashboardData = {};
-    let categoryChart = null;
-    let trendChart = null;
-
-    document.getElementById('inputDate').valueAsDate = new Date();
-
-    // タブ切り替え
-    function switchTab(tabName) {
-      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-      document.getElementById(`tab-${tabName}`).classList.add('active');
-
-      const navs = ['input', 'calendar', 'report', 'ai'];
-      navs.forEach(n => {
-        const btn = document.getElementById(`nav-${n}`);
-        if (n === tabName) {
-          btn.className = "flex flex-col items-center text-green-600 font-bold";
-        } else {
-          btn.className = "flex flex-col items-center text-gray-400";
-        }
+    const amount = val * sign;
+    try {
+      const res = await fetch(`${https://ice-broke-seeks-test.trycloudflare.com}/api/balance/update`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount: amount })
       });
-
-      const titles = { input: '入力', calendar: '履歴・明細', report: '月間レポート', ai: 'AI支出予測' };
-      document.getElementById('headerTitle').textContent = titles[tabName];
-
-      if (tabName !== 'input') loadData();
+      const data = await res.json();
+      document.getElementById('balanceDisplay').innerText = `${data.balance.toLocaleString()} 円`;
+      input.value = '';
+    } catch (e) {
+      alert("通信エラーが発生しました");
     }
+  }
 
-    // 収支タイプ切替
-    function setType(type) {
-      currentType = type;
-      const expBtn = document.getElementById('typeExpenseBtn');
-      const incBtn = document.getElementById('typeIncomeBtn');
-      const amtLabel = document.getElementById('amountLabel');
+  fetchBalance();
+</script>
 
-      if (type === 0) {
-        expBtn.className = "flex-1 py-1.5 rounded-lg bg-white text-green-600 shadow-sm transition";
-        incBtn.className = "flex-1 py-1.5 rounded-lg text-gray-500 transition";
-        amtLabel.textContent = "支出";
-      } else {
-        incBtn.className = "flex-1 py-1.5 rounded-lg bg-white text-blue-600 shadow-sm transition";
-        expBtn.className = "flex-1 py-1.5 rounded-lg text-gray-500 transition";
-        amtLabel.textContent = "収入";
-      }
-      renderCategories();
-    }
-
-    // カテゴリ表示
-    function renderCategories() {
-      const grid = document.getElementById('categoryGrid');
-      grid.innerHTML = '';
-      const filtered = categoriesData.filter(c => c.type === currentType);
-
-      filtered.forEach((cat, index) => {
-        if (index === 0 && !selectedCategoryId) selectedCategoryId = cat.id;
-
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        const isSelected = selectedCategoryId === cat.id;
-        btn.className = `p-3 rounded-xl border flex flex-col items-center justify-center text-xs font-bold transition ${
-          isSelected ? 'border-green-500 bg-green-50 text-green-700 shadow-sm' : 'border-gray-200 bg-white text-gray-600'
-        }`;
-        btn.onclick = () => { selectedCategoryId = cat.id; renderCategories(); };
-        btn.innerHTML = `<span class="text-base mb-1">🏷️</span><span>${cat.name}</span>`;
-        grid.appendChild(btn);
-      });
-    }
-
-    // カテゴリ取得
-    async function fetchCategories() {
-      try {
-        const res = await fetch(`${API_BASE_URL}/api/categories`);
-        const data = await res.json();
-        categoriesData = data.categories;
-        renderCategories();
-      } catch (e) { console.error(e); }
-    }
-
-    // トランザクション保存
-    async function saveTransaction() {
-      const amount = parseFloat(document.getElementById('amount').value);
-      if (!amount || amount <= 0) return alert('金額を入力してください');
-
-      const payload = {
-        input_date: document.getElementById('inputDate').value,
-        amount: amount,
-        category_id: selectedCategoryId,
-        memo: document.getElementById('memo').value || null,
-        type: currentType
-      };
-
-      try {
-        const res = await fetch(`${API_BASE_URL}/api/transactions`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-        if (res.ok) {
-          alert('✅ 保存しました！');
-          document.getElementById('amount').value = '';
-          document.getElementById('memo').value = '';
-        }
-      } catch (e) { alert('保存失敗'); }
-    }
-
-    // ダッシュボード全データ読み込み＆表示
-    async function loadData() {
-      try {
-        const res = await fetch(`${API_BASE_URL}/api/dashboard`);
-        dashboardData = await res.json();
-
-        // 1. カレンダー＆収支描画
-        let totalInc = 0, totalExp = 0;
-        dashboardData.transactions.forEach(t => {
-          if (t.type === 1) totalInc += t.amount;
-          else totalExp += t.amount;
-        });
-
-        document.getElementById('calIncome').textContent = `¥${totalInc.toLocaleString()}`;
-        document.getElementById('calExpense').textContent = `¥${totalExp.toLocaleString()}`;
-        document.getElementById('calTotal').textContent = `¥${(totalInc - totalExp).toLocaleString()}`;
-
-        document.getElementById('reportIncome').textContent = `+¥${totalInc.toLocaleString()}`;
-        document.getElementById('reportExpense').textContent = `-¥${totalExp.toLocaleString()}`;
-        document.getElementById('reportBalance').textContent = `¥${dashboardData.total_assets.toLocaleString()}`;
-        document.getElementById('aiPrediction').textContent = `¥${dashboardData.predicted_amount.toLocaleString()}`;
-
-        // 2. 履歴描画
-        renderHistoryList(dashboardData.transactions);
-
-        // 3. レポートグラフ
-        renderReportCharts();
-
-      } catch (e) { console.error(e); }
-    }
-
-    function renderHistoryList(list) {
-      const container = document.getElementById('dailyHistoryList');
-      container.innerHTML = '';
-      if (!list || list.length === 0) {
-        container.innerHTML = '<p class="text-xs text-gray-400 text-center py-4">データがありません</p>';
-        return;
-      }
-      list.forEach(item => {
-        const div = document.createElement('div');
-        div.className = "flex justify-between items-center p-2.5 bg-gray-50 rounded-xl border border-gray-100 text-xs";
-        div.innerHTML = `
-          <div>
-            <p class="font-bold text-gray-700">${item.category_name} <span class="text-[10px] text-gray-400 font-normal">(${item.input_date})</span></p>
-            <p class="text-gray-500">${item.memo || '-'}</p>
-          </div>
-          <p class="font-bold ${item.type === 1 ? 'text-blue-600' : 'text-red-500'}">
-            ${item.type === 1 ? '+' : '-'}¥${item.amount.toLocaleString()}
-          </p>
-        `;
-        container.appendChild(div);
-      });
-    }
-
-    function renderReportCharts() {
-      // 円グラフ
-      const cats = dashboardData.category_summary || [];
-      const labels = cats.map(c => c.category_name);
-      const amounts = cats.map(c => c.amount);
-      const totalAmount = amounts.reduce((a, b) => a + b, 0) || 1;
-
-      const ctx1 = document.getElementById('categoryDoughnut').getContext('2d');
-      if (categoryChart) categoryChart.destroy();
-      categoryChart = new Chart(ctx1, {
-        type: 'doughnut',
-        data: {
-          labels: labels,
-          datasets: [{ data: amounts, backgroundColor: ['#10b981', '#f59e0b', '#ef4444', '#3b82f6', '#8b5cf6', '#ec4899'] }]
-        },
-        options: { plugins: { legend: { display: false } } }
-      });
-
-      // 割合リスト
-      const percentContainer = document.getElementById('categoryPercentList');
-      percentContainer.innerHTML = '';
-      cats.forEach(c => {
-        const pct = ((c.amount / totalAmount) * 100).toFixed(1);
-        const div = document.createElement('div');
-        div.className = "flex justify-between items-center text-xs font-semibold text-gray-600 border-b pb-1";
-        div.innerHTML = `<span>🏷️ ${c.category_name}</span><span>¥${c.amount.toLocaleString()} (${pct}%)</span>`;
-        percentContainer.appendChild(div);
-      });
-
-      // AI推移グラフ
-      const trends = dashboardData.monthly_trends || [];
-      const ctx2 = document.getElementById('aiTrendChart').getContext('2d');
-      if (trendChart) trendChart.destroy();
-      trendChart = new Chart(ctx2, {
-        type: 'line',
-        data: {
-          labels: trends.map(t => t.month),
-          datasets: [{ label: '支出', data: trends.map(t => t.amount), borderColor: '#4f46e5', backgroundColor: 'rgba(79,70,229,0.1)', fill: true }]
-        },
-        options: { plugins: { legend: { display: false } } }
-      });
-    }
-
-    // 初期化
-    fetchCategories();
-  </script>
 </body>
 </html>
