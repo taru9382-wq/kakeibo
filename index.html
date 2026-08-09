@@ -37,19 +37,24 @@
 </div>
 
 <script>
-  // Step 4 でメモした URL に書き換えてください
-  const API_BASE_URL = "https://xxxx.trycloudflare.com"; 
+ // ここにURLを1つだけ設定しておきます（末尾の / は無し）
+  const API_BASE_URL = "https://ice-broke-seeks-test.trycloudflare.com"; 
 
+  // 残高の取得
   async function fetchBalance() {
     try {
       const res = await fetch(`${API_BASE_URL}/api/balance`);
+      if (!res.ok) throw new Error(`HTTPエラー: ${res.status}`);
       const data = await res.json();
       document.getElementById('balanceDisplay').innerText = `${data.balance.toLocaleString()} 円`;
+      document.getElementById('errorDisplay').innerText = "";
     } catch (e) {
       document.getElementById('balanceDisplay').innerText = "エラー";
+      document.getElementById('errorDisplay').innerText = e.message;
     }
   }
 
+  // 残高の更新
   async function updateBalance(sign) {
     const input = document.getElementById('amountInput');
     const val = parseInt(input.value);
@@ -57,16 +62,18 @@
 
     const amount = val * sign;
     try {
-      const res = await fetch(`${https://ice-broke-seeks-test.trycloudflare.com}/api/balance/update`, {
+      const res = await fetch(`${API_BASE_URL}/api/balance/update`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ amount: amount })
       });
+      if (!res.ok) throw new Error(`更新エラー: ${res.status}`);
       const data = await res.json();
       document.getElementById('balanceDisplay').innerText = `${data.balance.toLocaleString()} 円`;
       input.value = '';
+      document.getElementById('errorDisplay').innerText = "";
     } catch (e) {
-      alert("通信エラーが発生しました");
+      document.getElementById('errorDisplay').innerText = e.message;
     }
   }
 
